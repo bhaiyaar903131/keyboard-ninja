@@ -6,6 +6,7 @@ const playfield = document.getElementById('playfield');
 const wordLayer = document.getElementById('wordLayer');
 const typingDock = document.getElementById('typingDock');
 const typedText = document.getElementById('typedText');
+const livesText = document.getElementById('lives');
 const wordBank = [
   'array', 'binary', 'branch', 'buffer', 'canvas', 'cipher', 'client', 'compile',
   'cursor', 'debug', 'deploy', 'domain', 'encode', 'engine', 'event', 'frame',
@@ -19,6 +20,7 @@ let lastSpawn = 0;
 let spawnDelay = 1650;
 let typedBuffer = '';
 let activeTarget = null;
+let lives = 3;
 
 function randomWord() {
   return wordBank[Math.floor(Math.random() * wordBank.length)];
@@ -45,11 +47,12 @@ function removeWord(word) {
   word.element.remove();
 }
 function updateWords(delta) {
-  const floor = playfield.clientHeight + 45;
+  const floor = playfield.clientHeight - 68;
   for (const word of [...fallingWords]) {
     word.y += word.speed * delta;
     word.element.style.transform = `translate3d(${word.x}px, ${word.y}px, 0)`;
-    if (word.y > floor) removeWord(word);
+    word.element.classList.toggle('danger', word.y > floor - 90);
+    if (word.y > floor) loseLife(word);
   }
 }
 
@@ -116,6 +119,35 @@ function handleTyping(key) {
   if (typedBuffer === target.text) completeWord(target);
 }
 
+
+function updateLives() {
+  livesText.textContent = Array.from({ length: 3 }, (_, index) =>
+    index < lives ? '♥' : '·'
+  ).join(' ');
+}
+function loseLife(word) {
+  if (word === activeTarget) resetTyping();
+  removeWord(word);
+  lives = Math.max(0, lives - 1);
+  updateLives();
+  playfield.classList.remove('hit');
+  void playfield.offsetWidth;
+  playfield.classList.add('hit');
+  if (lives === 0) {
+    running = false;
+    typingDock.hidden = true;
+    startCard.hidden = false;
+    startCard.classList.add('fail');
+    startCard.querySelector('h2').textContent = 'Out of lives.';
+    startCard.querySelector('p').textContent = 'Three misses. The run is over.';
+    startCard.querySelector('.start-key').textContent = 'PRESS ENTER TO TRY AGAIN';
+  }
+}
+function clearFallingWords() {
+  for (const word of [...fallingWords]) removeWord(word);
+  resetTyping();
+}
+
 function gameLoop(time) {
   if (!running) return;
   const delta = Math.min((time - lastFrame) / 1000 || 0, 0.04);
@@ -128,6 +160,12 @@ function gameLoop(time) {
   requestAnimationFrame(gameLoop);
 }
 function startGame() {
+  if (lives === 0) {
+    lives = 3;
+    clearFallingWords();
+    updateLives();
+    startCard.classList.remove('fail');
+  }
   running = true;
   startedAt = Date.now();
   lastFrame = performance.now();
